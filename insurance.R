@@ -5,7 +5,7 @@ library(igraph)
 library(stringr)
 library(causaleffect)
 
-source("02_findtrclust.R")
+source("02_findconduits.R")
 source("03_findtrcomp.R")
 
 # Function that adds an unobserved confounder between two variables

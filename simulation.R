@@ -1,6 +1,6 @@
 # Running the simulation of Section 6.1
 
-source("02_findtrclust.R")
+source("02_findconduits.R")
 source("03_findtrcomp.R")
 load("networks.RData")
 
