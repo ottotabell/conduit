@@ -4,6 +4,7 @@ source("01_utils.R")
 
 find_transit_components <- function(g, prohibit = character(0), singletons = FALSE) {
   nodes <- igraph::V(g)
+  edges <- igraph::E(g)
   n <- length(nodes)
   if (length(prohibit)) {
     restrict <- setdiff(igraph::V(g)$name, prohibit)
@@ -11,10 +12,10 @@ find_transit_components <- function(g, prohibit = character(0), singletons = FAL
     restrict <- igraph::V(g)$name
   }
   
-  pa <- setNames(lapply(nodes, function(x) parents(x, g, nodes)[-1]), nodes$name)
-  ch <- setNames(lapply(nodes, function(x) children(x, g, nodes)[-1]), nodes$name)
-  an <- setNames(lapply(nodes, function(x) ancestors(x, g, nodes)), nodes$name)
-  de <- setNames(lapply(nodes, function(x) descendants(x, g, nodes)), nodes$name)
+  pa <- parents_lst(nodes, g, nodes, self = FALSE)
+  ch <- children_lst(nodes, g, nodes, self = FALSE)
+  an <- ancestors_lst(nodes, g, nodes)
+  de <- descendants_lst(nodes, g, nodes)
   
   # Potential receivers
   C_set <- ch[sapply(ch, length) > 0]
@@ -84,7 +85,7 @@ find_transit_components <- function(g, prohibit = character(0), singletons = FAL
       if (n_XY) {
         # Construct A from vertices connected to X and Y
         # when incoming edges to X and outgoing edges from Y are removed
-        g_ne <- edge_subgraph(g, X, Y)
+        g_ne <- edge_subgraph(g, edges, X, Y)
         A <- uu(connected(XY, g_ne))
         if (length(A) > 1 && all(A %in% restrict)) {
           comp <- igraph::components(igraph::induced_subgraph(g, A))
@@ -96,7 +97,9 @@ find_transit_components <- function(g, prohibit = character(0), singletons = FAL
             if (n_A_k > 1 && n_A_k < n) {
               X_k <- intersect(X, A_k)
               Y_k <- intersect(Y, A_k)
-              tc <- c(tc, is_transit_component(X_k, Y_k, A_k, g))
+              pa_X_k <- lapply(pa[X_k], function(x) setdiff(x, A_k))
+              ch_Y_k <- lapply(ch[Y_k], function(x) setdiff(x, A_k))
+              tc <- c(tc, is_transit_component(X_k, Y_k, pa_X_k, ch_Y_k, A_k, g, nodes))
             }
           }
         }
@@ -106,35 +109,36 @@ find_transit_components <- function(g, prohibit = character(0), singletons = FAL
   unique(tc)
 }
 
-is_transit_component <- function(X, Y, A, g) {
+is_transit_component <- function(X, Y, pa_X, ch_Y, A, g, v) {
   # All receiver candidates must have the same parents outside A
-  pa_X <- lapply(X, function(x) {
-    setdiff(parents(x, g), A)
-  })
   if (length(unique(pa_X)) > 1) return(NULL)
   # All emitter candidates must have the same children outside A
-  ch_Y <- lapply(Y, function(y) {
-    setdiff(children(y, g), A)
-  })
   if (length(unique(ch_Y)) > 1) return(NULL)
+  list(
+    list(
+      vertices = A,
+      receivers = X,
+      emitters = Y
+    )
+  )
   # Confirm that there are no receivers that should not be emitters
   # and that there are no emitters that should not be receivers
-  XY <- intersect(X, Y)
-  ex_X <- setdiff(X, XY)
-  ex_Y <- setdiff(Y, XY)
-  X_leak <- setdiff(uu(children(ex_X, g)), A)
-  Y_leak <- setdiff(uu(parents(ex_Y, g)), A)
-  if (!length(X_leak) && !length(Y_leak)) {
-    list(
-      list(
-        vertices = A,
-        receivers = X,
-        emitters = Y
-      )
-    )
-  } else {
-    NULL
-  }
+  # XY <- intersect(X, Y)
+  # ex_X <- setdiff(X, XY)
+  # ex_Y <- setdiff(Y, XY)
+  # X_leak <- setdiff(uu(children(ex_X, g)), A)
+  # Y_leak <- setdiff(uu(parents(ex_Y, g)), A)
+  # if (!length(X_leak) && !length(Y_leak)) {
+  #   list(
+  #     list(
+  #       vertices = A,
+  #       receivers = X,
+  #       emitters = Y
+  #     )
+  #   )
+  # } else {
+  #   NULL
+  # }
 }
 
 find_transit_clusters <- function(g, tgr) {
